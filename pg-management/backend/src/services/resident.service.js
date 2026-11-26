@@ -3,6 +3,12 @@ import mongoose from "mongoose";
 import Room from "../models/Room.js";
 import Resident from "../models/Resident.js";
 
+const createError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
 export const registerResident = async (residentData) => {
   const session = await mongoose.startSession();
 
@@ -26,7 +32,7 @@ export const registerResident = async (residentData) => {
       }).session(session);
 
       if (!room) {
-        throw new Error("Room not found or inactive");
+        throw createError("Room not found or inactive", 404);
       }
 
       // 2. Validate the selected bed.
@@ -35,7 +41,10 @@ export const registerResident = async (residentData) => {
         bedNumber < 1 ||
         bedNumber > room.capacity
       ) {
-        throw new Error("Invalid bed number for this room");
+        throw createError(
+          "Invalid bed number for this room",
+          400
+        );
       }
 
       // 3. Check for an existing active resident with this phone.
@@ -45,7 +54,10 @@ export const registerResident = async (residentData) => {
       }).session(session);
 
       if (existingResident) {
-        throw new Error("This phone number is already registered");
+        throw createError(
+          "This phone number is already registered",
+          409
+        );
       }
 
       // 4. Check whether the selected bed is occupied.
@@ -56,10 +68,13 @@ export const registerResident = async (residentData) => {
       }).session(session);
 
       if (occupiedBed) {
-        throw new Error("This bed is already occupied");
+        throw createError(
+          "This bed is already occupied",
+          409
+        );
       }
 
-      // 5. Create resident with rent taken from the room.
+      // 5. Create resident using rent from the Room collection.
       const [resident] = await Resident.create(
         [
           {
@@ -81,8 +96,9 @@ export const registerResident = async (residentData) => {
     return registeredResident;
   } catch (error) {
     if (error.code === 11000) {
-      throw new Error(
-        "This phone number or bed is already assigned"
+      throw createError(
+        "This phone number or bed is already assigned",
+        409
       );
     }
 
